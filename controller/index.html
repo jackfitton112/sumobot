@@ -144,7 +144,10 @@
             }
         });
 
-        controlCanvas.addEventListener('mousedown', () => isMouseDown = true);
+        controlCanvas.addEventListener('mousedown', () => {
+            isMouseDown = true;
+        });
+
         controlCanvas.addEventListener('mousemove', (event) => {
             if (!isMouseDown) return;
             const rect = controlCanvas.getBoundingClientRect();
@@ -157,6 +160,7 @@
             event.preventDefault();
             isMouseDown = true;
         });
+
         controlCanvas.addEventListener('touchmove', (event) => {
             event.preventDefault();
             if (!isMouseDown) return;
