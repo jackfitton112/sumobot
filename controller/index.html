@@ -45,15 +45,15 @@
         const leftMotorValueSpan = document.getElementById('leftMotorValue');
         const rightMotorValueSpan = document.getElementById('rightMotorValue');
 
-        var deviceName = 'ESP32';
+        var deviceName = 'SumoBot1';
         var bleService = 'a45cc169-be38-42d5-a22b-f2ebbf442344';
-        var leftMotorCharacteristicUUID = 'a45cc169-be38-42d5-a22b-f2ebbf442345';
-        var rightMotorCharacteristicUUID = 'a45cc169-be38-42d5-a22b-f2ebbf442346';
+        var motorCharacteristicUUID = 'a45cc169-be38-42d5-a22b-f2ebbf442345';
 
         var bleServer;
-        var leftMotorCharacteristic;
-        var rightMotorCharacteristic;
+        var motorCharacteristic;
         var deviceConnected = false;
+        var isMouseDown = false;
+        var writeInProgress = false;
 
         connectButton.addEventListener('click', () => {
             if (isWebBluetoothEnabled()) {
@@ -75,10 +75,8 @@
 
         function connectToDevice() {
             console.log('Initializing Bluetooth...');
-            navigator.bluetooth.requestDevice({
-                filters: [{ name: deviceName }],
-                optionalServices: [bleService]
-            })
+            // acceptAllDevices: true allows the user to select any device
+            navigator.bluetooth.requestDevice({acceptAllDevices: true})
             .then(device => {
                 console.log('Device Selected:', device.name);
                 bleStateContainer.innerHTML = 'Connected to device ' + device.name;
@@ -92,16 +90,12 @@
                 return bleServer.getPrimaryService(bleService);
             })
             .then(service => {
-                return Promise.all([
-                    service.getCharacteristic(leftMotorCharacteristicUUID),
-                    service.getCharacteristic(rightMotorCharacteristicUUID)
-                ]);
+                return service.getCharacteristic(motorCharacteristicUUID);
             })
-            .then(characteristics => {
-                leftMotorCharacteristic = characteristics[0];
-                rightMotorCharacteristic = characteristics[1];
+            .then(characteristic => {
+                motorCharacteristic = characteristic;
                 deviceConnected = true;
-                console.log("Motor characteristics discovered.");
+                console.log("Motor characteristic discovered.");
             })
             .catch(error => {
                 console.log('Error: ', error);
@@ -128,28 +122,53 @@
             }
         }
 
-        controlCanvas.addEventListener('mousemove', handleCanvasEvent);
-        controlCanvas.addEventListener('touchmove', handleCanvasEvent);
-
-        controlCanvas.addEventListener('mouseup', recenterCanvas);
-        controlCanvas.addEventListener('mouseleave', recenterCanvas);
-        controlCanvas.addEventListener('touchend', recenterCanvas);
-
-        function handleCanvasEvent(event) {
-            event.preventDefault();
-            let x, y;
-            if (event.type === 'touchmove') {
-                const touch = event.touches[0];
-                const rect = controlCanvas.getBoundingClientRect();
-                x = touch.clientX - rect.left;
-                y = touch.clientY - rect.top;
-            } else {
-                const rect = controlCanvas.getBoundingClientRect();
-                x = event.clientX - rect.left;
-                y = event.clientY - rect.top;
+        document.addEventListener('mouseup', () => {
+            if (isMouseDown) {
+                isMouseDown = false;
+                recenterCanvas();
             }
+
+            // If the mouse is released, stop the robot with 100ms delay
+            setTimeout(() => {
+                writeMotorValues(128, 128);
+                console.log("Mouse released");
+            }, 200);
+        
+
+
+        });
+
+        document.addEventListener('touchend', () => {
+            if (isMouseDown) {
+                isMouseDown = false;
+                recenterCanvas();
+            }
+
+            // If the touch is released, stop the robot
+            setTimeout(() => {
+                writeMotorValues(128, 128);
+                console.log("Touch released");
+            }, 200);
+        });
+
+        controlCanvas.addEventListener('mousedown', () => isMouseDown = true);
+        controlCanvas.addEventListener('mousemove', (event) => {
+            if (!isMouseDown) return;
+            const rect = controlCanvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
             updateMotorValues(x, y);
-        }
+        });
+
+        controlCanvas.addEventListener('touchstart', () => isMouseDown = true);
+        controlCanvas.addEventListener('touchmove', (event) => {
+            if (!isMouseDown) return;
+            const touch = event.touches[0];
+            const rect = controlCanvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            updateMotorValues(x, y);
+        });
 
         function recenterCanvas() {
             updateMotorValues(controlCanvas.width / 2, controlCanvas.height / 2);
@@ -171,163 +190,24 @@
             rightMotorValueSpan.innerHTML = `${rightMotorPercentage}%`;
 
             if (deviceConnected) {
-                writeMotorValue(leftMotorCharacteristic, leftMotorValue);
-                writeMotorValue(rightMotorCharacteristic, rightMotorValue);
+                writeMotorValues(leftMotorValue, rightMotorValue);
             }
 
             drawCanvas(x, y);
         }
 
-        function writeMotorValue(characteristic, value) {
-            const data = new Uint8Array([value]);
-            characteristic.writeValue(data)
-                .then(() => {
-                    console.log("Value written:", value);
-                })
-                .catch(error => {
-                    console.error("Error writing value:", error);
-                });
-        }
-
-        function drawCanvas(x, y) {
-            ctx.clearRect(0, 0, controlCanvas.width, controlCanvas.height);
-            ctx.beginPath();
-            ctx.arc(x, y, 5, 0, 2 * Math.PI);
-            ctx.fill();
-        }
-    </script>
-</body>
-</html>
-
-    <script>
-        const connectButton = document.getElementById('connectBleButton');
-        const disconnectButton = document.getElementById('disconnectBleButton');
-        const controlCanvas = document.getElementById('controlCanvas');
-        const ctx = controlCanvas.getContext('2d');
-        const bleStateContainer = document.getElementById('bleState');
-        const leftMotorValueSpan = document.getElementById('leftMotorValue');
-        const rightMotorValueSpan = document.getElementById('rightMotorValue');
-
-        var deviceName = 'ESP32';
-        var bleService = 'a45cc169-be38-42d5-a22b-f2ebbf442344';
-        var leftMotorCharacteristicUUID = 'a45cc169-be38-42d5-a22b-f2ebbf442345';
-        var rightMotorCharacteristicUUID = 'a45cc169-be38-42d5-a22b-f2ebbf442346';
-
-        var bleServer;
-        var leftMotorCharacteristic;
-        var rightMotorCharacteristic;
-        var deviceConnected = false;
-
-        connectButton.addEventListener('click', () => {
-            if (isWebBluetoothEnabled()) {
-                connectToDevice();
+        async function writeMotorValues(leftValue, rightValue) {
+            if (writeInProgress) return;
+            writeInProgress = true;
+            try {
+                const data = new Uint8Array([leftValue, rightValue]);
+                await motorCharacteristic.writeValue(data);
+                console.log("Values written:", leftValue, rightValue);
+            } catch (error) {
+                console.error("Error writing values:", error);
+            } finally {
+                writeInProgress = false;
             }
-        });
-
-        disconnectButton.addEventListener('click', disconnectDevice);
-
-        function isWebBluetoothEnabled() {
-            if (!navigator.bluetooth) {
-                console.log("Web Bluetooth API is not available in this browser!");
-                bleStateContainer.innerHTML = "Web Bluetooth API is not available in this browser!";
-                return false;
-            }
-            console.log('Web Bluetooth API supported in this browser.');
-            return true;
-        }
-
-        function connectToDevice() {
-            console.log('Initializing Bluetooth...');
-            navigator.bluetooth.requestDevice({
-                filters: [{ name: deviceName }],
-                optionalServices: [bleService]
-            })
-            .then(device => {
-                console.log('Device Selected:', device.name);
-                bleStateContainer.innerHTML = 'Connected to device ' + device.name;
-                bleStateContainer.classList.replace("text-red-500", "text-green-500");
-                device.addEventListener('gattservicedisconnected', onDisconnected);
-                return device.gatt.connect();
-            })
-            .then(gattServer => {
-                bleServer = gattServer;
-                console.log("Connected to GATT Server");
-                return bleServer.getPrimaryService(bleService);
-            })
-            .then(service => {
-                return Promise.all([
-                    service.getCharacteristic(leftMotorCharacteristicUUID),
-                    service.getCharacteristic(rightMotorCharacteristicUUID)
-                ]);
-            })
-            .then(characteristics => {
-                leftMotorCharacteristic = characteristics[0];
-                rightMotorCharacteristic = characteristics[1];
-                deviceConnected = true;
-                console.log("Motor characteristics discovered.");
-            })
-            .catch(error => {
-                console.log('Error: ', error);
-            });
-        }
-
-        function onDisconnected(event) {
-            console.log('Device Disconnected:', event.target.device.name);
-            bleStateContainer.innerHTML = "Device disconnected";
-            bleStateContainer.classList.replace("text-green-500", "text-red-500");
-            deviceConnected = false;
-        }
-
-        function disconnectDevice() {
-            if (deviceConnected) {
-                bleServer.disconnect();
-                console.log("Device Disconnected");
-                bleStateContainer.innerHTML = "Device Disconnected";
-                bleStateContainer.classList.replace("text-green-500", "text-red-500");
-                deviceConnected = false;
-            } else {
-                console.error("Bluetooth is not connected.");
-                window.alert("Bluetooth is not connected.")
-            }
-        }
-
-        controlCanvas.addEventListener('mousemove', (event) => {
-            if (event.buttons !== 1) return; // Only proceed if the left mouse button is pressed
-            const rect = controlCanvas.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            updateMotorValues(x, y);
-        });
-
-        function updateMotorValues(x, y) {
-            const centerX = controlCanvas.width / 2;
-            const centerY = controlCanvas.height / 2;
-            const deltaX = x - centerX;
-            const deltaY = centerY - y;
-
-            const leftMotorValue = Math.min(Math.max(128 + deltaY - deltaX, 0), 255);
-            const rightMotorValue = Math.min(Math.max(128 + deltaY + deltaX, 0), 255);
-
-            leftMotorValueSpan.innerHTML = leftMotorValue;
-            rightMotorValueSpan.innerHTML = rightMotorValue;
-
-            if (deviceConnected) {
-                writeMotorValue(leftMotorCharacteristic, leftMotorValue);
-                writeMotorValue(rightMotorCharacteristic, rightMotorValue);
-            }
-
-            drawCanvas(x, y);
-        }
-
-        function writeMotorValue(characteristic, value) {
-            const data = new Uint8Array([value]);
-            characteristic.writeValue(data)
-                .then(() => {
-                    console.log("Value written:", value);
-                })
-                .catch(error => {
-                    console.error("Error writing value:", error);
-                });
         }
 
         function drawCanvas(x, y) {

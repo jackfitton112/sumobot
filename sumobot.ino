@@ -5,8 +5,7 @@
 
 // BLE UUIDs
 #define SERVICE_UUID        "a45cc169-be38-42d5-a22b-f2ebbf442344"
-#define LEFT_MOTOR_UUID     "a45cc169-be38-42d5-a22b-f2ebbf442345"
-#define RIGHT_MOTOR_UUID    "a45cc169-be38-42d5-a22b-f2ebbf442346"
+#define MOTOR_CHARACTERISTIC_UUID "a45cc169-be38-42d5-a22b-f2ebbf442345"
 
 // Motor control pins
 #define AIN1_PIN 22
@@ -15,16 +14,12 @@
 #define BIN2_PIN 18
 
 BLEServer* pServer = NULL;
-BLECharacteristic* pLeftMotorCharacteristic = NULL;
-BLECharacteristic* pRightMotorCharacteristic = NULL;
+BLECharacteristic* pMotorCharacteristic = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
 int leftMotorValue = 128;
 int rightMotorValue = 128;
-
-//Function prototypes
-void controlMotor(int pin1, int pin2, int motorValue);
 
 class MyServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
@@ -33,26 +28,6 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
   void onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
-  }
-};
-
-class MotorCharacteristicCallbacks : public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic* pCharacteristic) {
-    String value = pCharacteristic->getValue();
-    if (value.length() > 0) {
-      int motorValue = static_cast<int>(value[0]);
-      if (pCharacteristic == pLeftMotorCharacteristic) {
-        leftMotorValue = motorValue;
-        Serial.print("Left Motor Value: ");
-        Serial.println(leftMotorValue);
-        controlMotor(AIN1_PIN, AIN2_PIN, leftMotorValue);
-      } else if (pCharacteristic == pRightMotorCharacteristic) {
-        rightMotorValue = motorValue;
-        Serial.print("Right Motor Value: ");
-        Serial.println(rightMotorValue);
-        controlMotor(BIN1_PIN, BIN2_PIN, rightMotorValue);
-      }
-    }
   }
 };
 
@@ -69,6 +44,20 @@ void controlMotor(int pin1, int pin2, int motorValue) {
   }
 }
 
+class MotorCharacteristicCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* pCharacteristic) {
+    String value = pCharacteristic->getValue();
+    if (value.length() == 2) {
+      leftMotorValue = static_cast<int>(value[0]);
+      rightMotorValue = static_cast<int>(value[1]);
+      controlMotor(AIN1_PIN, AIN2_PIN, leftMotorValue);
+      controlMotor(BIN1_PIN, BIN2_PIN, rightMotorValue);
+    }
+  }
+};
+
+
+
 void setup() {
   Serial.begin(115200);
 
@@ -77,25 +66,19 @@ void setup() {
   pinMode(BIN1_PIN, OUTPUT);
   pinMode(BIN2_PIN, OUTPUT);
 
-  BLEDevice::init("ESP32");
+  BLEDevice::init("SumoBot1");
 
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
   BLEService *pService = pServer->createService(SERVICE_UUID);
 
-  pLeftMotorCharacteristic = pService->createCharacteristic(
-                      LEFT_MOTOR_UUID,
+  pMotorCharacteristic = pService->createCharacteristic(
+                      MOTOR_CHARACTERISTIC_UUID,
                       BLECharacteristic::PROPERTY_WRITE
                     );
 
-  pRightMotorCharacteristic = pService->createCharacteristic(
-                      RIGHT_MOTOR_UUID,
-                      BLECharacteristic::PROPERTY_WRITE
-                    );
-
-  pLeftMotorCharacteristic->setCallbacks(new MotorCharacteristicCallbacks());
-  pRightMotorCharacteristic->setCallbacks(new MotorCharacteristicCallbacks());
+  pMotorCharacteristic->setCallbacks(new MotorCharacteristicCallbacks());
 
   pService->start();
 
