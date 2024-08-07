@@ -9,6 +9,7 @@
         canvas {
             border: 2px solid #2d3748;
             border-radius: 0.5rem;
+            touch-action: none; /* Prevents pull-to-refresh on mobile */
         }
     </style>
 </head>
@@ -75,8 +76,10 @@
 
         function connectToDevice() {
             console.log('Initializing Bluetooth...');
-            // acceptAllDevices: true allows the user to select any device
-            navigator.bluetooth.requestDevice({acceptAllDevices: true})
+            navigator.bluetooth.requestDevice({
+                filters: [{ name: deviceName }],
+                optionalServices: [bleService]
+            })
             .then(device => {
                 console.log('Device Selected:', device.name);
                 bleStateContainer.innerHTML = 'Connected to device ' + device.name;
@@ -126,29 +129,19 @@
             if (isMouseDown) {
                 isMouseDown = false;
                 recenterCanvas();
-            }
-
-            // If the mouse is released, stop the robot with 100ms delay
-            setTimeout(() => {
                 writeMotorValues(128, 128);
                 console.log("Mouse released");
-            }, 200);
-        
-
-
+            }
         });
 
-        document.addEventListener('touchend', () => {
+        document.addEventListener('touchend', (event) => {
+            event.preventDefault();
             if (isMouseDown) {
                 isMouseDown = false;
                 recenterCanvas();
-            }
-
-            // If the touch is released, stop the robot
-            setTimeout(() => {
                 writeMotorValues(128, 128);
                 console.log("Touch released");
-            }, 200);
+            }
         });
 
         controlCanvas.addEventListener('mousedown', () => isMouseDown = true);
@@ -160,8 +153,12 @@
             updateMotorValues(x, y);
         });
 
-        controlCanvas.addEventListener('touchstart', () => isMouseDown = true);
+        controlCanvas.addEventListener('touchstart', (event) => {
+            event.preventDefault();
+            isMouseDown = true;
+        });
         controlCanvas.addEventListener('touchmove', (event) => {
+            event.preventDefault();
             if (!isMouseDown) return;
             const touch = event.touches[0];
             const rect = controlCanvas.getBoundingClientRect();
