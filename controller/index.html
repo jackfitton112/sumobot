@@ -134,8 +134,7 @@
             }
         });
 
-        document.addEventListener('touchend', (event) => {
-            event.preventDefault();
+        document.addEventListener('touchend', () => {
             if (isMouseDown) {
                 isMouseDown = false;
                 recenterCanvas();
@@ -144,8 +143,9 @@
             }
         });
 
-        controlCanvas.addEventListener('mousedown', () => {
+        controlCanvas.addEventListener('mousedown', (event) => {
             isMouseDown = true;
+            event.preventDefault(); // Prevent default only on canvas interactions
         });
 
         controlCanvas.addEventListener('mousemove', (event) => {
@@ -157,13 +157,13 @@
         });
 
         controlCanvas.addEventListener('touchstart', (event) => {
-            //event.preventDefault();
             isMouseDown = true;
+            event.preventDefault(); // Prevent default only on canvas interactions
         });
 
         controlCanvas.addEventListener('touchmove', (event) => {
-            event.preventDefault();
             if (!isMouseDown) return;
+            event.preventDefault(); // Prevent default only on canvas interactions
             const touch = event.touches[0];
             const rect = controlCanvas.getBoundingClientRect();
             const x = touch.clientX - rect.left;
